@@ -109,7 +109,7 @@ jobs:
           echo "PREVIOUS_VERSION=$(docker inspect --format='{{.Config.Image}}' technova-app 2>/dev/null || echo 'none')" >> $GITHUB_ENV
 
           # Pull new image
-          docker pull ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker pull ${{ env.REGISTRY }}/synthever/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
           # Deploy with docker-compose
           docker compose -f docker-compose.yml up -d --force-recreate app
