@@ -1,0 +1,116 @@
+# ═══════════════════════════════════════════════════════
+# TechNova DevOps Stack — Full Docker Compose
+# App + Prometheus + Grafana + Loki + Promtail + SonarQube
+# ═══════════════════════════════════════════════════════
+
+services:
+  # ─── Application ───
+  app:
+    build: .
+    container_name: technova-app
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=sqlite:///inventory.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "technova-app"
+    networks:
+      - technova-net
+
+  # ─── Prometheus ───
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: technova-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    restart: unless-stopped
+    networks:
+      - technova-net
+
+  # ─── Grafana ───
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: technova-grafana
+    ports:
+      - "8090:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=technova2024
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - technova-net
+
+  # ─── Loki (Log Aggregation) ───
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: technova-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - technova-net
+
+  # ─── Promtail (Log Collector) ───
+  promtail:
+    image: grafana/promtail:3.1.0
+    container_name: technova-promtail
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    restart: unless-stopped
+    depends_on:
+      - loki
+    networks:
+      - technova-net
+
+  # ─── SonarQube ───
+  sonarqube:
+    image: sonarqube:10.6-community
+    container_name: technova-sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    restart: unless-stopped
+    networks:
+      - technova-net
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  sonarqube_data:
+  sonarqube_extensions:
+
+networks:
+  technova-net:
+    driver: bridge

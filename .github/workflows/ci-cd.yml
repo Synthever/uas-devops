@@ -1,0 +1,129 @@
+name: TechNova CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: technova-inventory
+  REGISTRY: ghcr.io
+
+jobs:
+  # ═══════════════════════════════════════════
+  # Stage 1: Lint & Unit Test
+  # ═══════════════════════════════════════════
+  test:
+    name: "🧪 Test & Coverage"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v --tb=short \
+            --cov=app --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ═══════════════════════════════════════════
+  # Stage 2: SonarQube Code Analysis
+  # ═══════════════════════════════════════════
+  sonarqube:
+    name: "🔒 SonarQube Analysis"
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  # ═══════════════════════════════════════════
+  # Stage 3: Build Docker Image
+  # ═══════════════════════════════════════════
+  build:
+    name: "🐳 Build & Push Image"
+    runs-on: ubuntu-latest
+    needs: [test, sonarqube]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  # ═══════════════════════════════════════════
+  # Stage 4: Deploy to Production
+  # ═══════════════════════════════════════════
+  deploy:
+    name: "🚀 Deploy"
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy with rollback support
+        run: |
+          echo "=== Deploying version: ${{ github.sha }} ==="
+          # Tag current running version for rollback
+          echo "PREVIOUS_VERSION=$(docker inspect --format='{{.Config.Image}}' technova-app 2>/dev/null || echo 'none')" >> $GITHUB_ENV
+
+          # Pull new image
+          docker pull ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+          # Deploy with docker-compose
+          docker compose -f docker-compose.yml up -d --force-recreate app
+
+          # Health check
+          echo "Waiting for health check..."
+          sleep 10
+          if curl -sf http://localhost:5000/api/health; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Health check failed! Rolling back..."
+            docker compose -f docker-compose.yml down app
+            if [ "$PREVIOUS_VERSION" != "none" ]; then
+              docker run -d --name technova-app $PREVIOUS_VERSION
+            fi
+            exit 1
+          fi

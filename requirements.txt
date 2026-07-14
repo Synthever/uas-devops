@@ -1,0 +1,7 @@
+flask==3.1.*
+flask-sqlalchemy==3.1.*
+prometheus-client==0.21.*
+gunicorn==23.*
+pytest==8.*
+pytest-cov==6.*
+requests==2.*
