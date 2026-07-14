@@ -114,7 +114,20 @@ Untuk mengatasi masalah tersebut, tim DevOps ditugaskan merancang dan mengimplem
 6. **Deploy** — Image di-deploy ke production menggunakan Docker Compose
 7. **Monitor** — Prometheus mengumpulkan metrics, Grafana menampilkan dashboard, Loki mengaggregasi log
 
-### 2.3 Rollback Mechanism
+### 2.3 Hasil Implementasi CI/CD
+
+Pipeline berhasil dijalankan di GitHub Actions dengan hasil:
+
+| Stage | Status | Durasi | Keterangan |
+|---|---|---|---|
+| Test & Coverage | ✅ Passed | 19s | 17/17 tests passed, 93% coverage |
+| SonarQube Analysis | ✅ Passed | 1m2s | Code quality dan security check |
+| Build & Push Image | ✅ Passed | 26s | Docker image pushed ke GHCR |
+| Deploy | ❌ Expected Fail | 27s | Butuh production server dengan Docker |
+
+**Catatan:** Deploy stage gagal karena GitHub Actions runner tidak memiliki akses ke production server. Dalam implementasi nyata, stage ini akan berjalan di server production yang memiliki Docker dan docker-compose terinstall. Pipeline mendemonstrasikan alur lengkap CI/CD dari testing hingga deployment.
+
+### 2.4 Rollback Mechanism
 
 Pipeline kami menyertakan mekanisme rollback otomatis:
 
