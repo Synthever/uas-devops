@@ -120,12 +120,14 @@ Pipeline berhasil dijalankan di GitHub Actions dengan hasil:
 
 | Stage | Status | Durasi | Keterangan |
 |---|---|---|---|
-| Test & Coverage | ✅ Passed | 19s | 17/17 tests passed, 93% coverage |
-| SonarQube Analysis | ✅ Passed | 1m2s | Code quality dan security check |
-| Build & Push Image | ✅ Passed | 26s | Docker image pushed ke GHCR |
-| Deploy | ❌ Expected Fail | 27s | Butuh production server dengan Docker |
+| Test & Coverage | ✅ Passed | 12s | 17/17 tests passed, 93% coverage |
+| SonarQube Analysis | ✅ Passed | 1m14s | Code quality dan security check |
+| Build & Push Image | ✅ Passed | 32s | Docker image pushed ke GHCR |
+| Deploy | ✅ Passed | 6s | Simulation mode (demo deployment flow) |
 
-**Catatan:** Deploy stage gagal karena GitHub Actions runner tidak memiliki akses ke production server. Dalam implementasi nyata, stage ini akan berjalan di server production yang memiliki Docker dan docker-compose terinstall. Pipeline mendemonstrasikan alur lengkap CI/CD dari testing hingga deployment.
+**Run URL:** https://github.com/Synthever/uas-devops/actions/runs/29384245976
+
+**Catatan:** Deploy stage menggunakan simulation mode untuk demonstrasi, yang menampilkan langkah-langkah deployment yang akan dilakukan di production environment. Dalam implementasi nyata dengan self-hosted runner atau SSH access, stage ini akan melakukan actual deployment ke production server.
 
 ### 2.4 Rollback Mechanism
 
